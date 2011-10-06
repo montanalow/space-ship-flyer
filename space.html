@@ -1,0 +1,207 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <title>RescueTime</title>
+  </head>
+  <body onload="mtl.init()">
+  <canvas id="canvas" class="output" width="1024px" height="768px" style="width:1024px;height:768px;border:0px;margin:0px;padding:0px;" >
+  </canvas>
+  <script type="text/javascript">
+    mtl = {
+      KEY_REPEAT: 100, // ms
+      init: function() {
+        document.addEventListener('keydown',mtl.keydown,false);
+        document.addEventListener('keyup',mtl.keyup,false);
+        mtl.canvas = document.getElementById('canvas');
+        mtl.context = canvas.getContext('2d');
+        mtl.board = new mtl.Board();
+        mtl.ship = new mtl.Ship();
+        setInterval(mtl.draw,30);
+        setInterval(mtl.stats.update,1000);
+      },
+      keydown: function(event){
+        switch(event.keyCode){
+          case 37: // left
+            mtl.ship.rotateLeft(true);
+            event.stopPropagation();
+            break;
+          case 38: // up
+            mtl.ship.accelerate(true);
+            event.stopPropagation();
+            break;
+          case 39: // right
+            mtl.ship.rotateRight(true);
+            event.stopPropagation();
+            break;
+          case 40: // down
+            mtl.ship.decelerate(true);
+            event.stopPropagation();
+            break;
+        }
+      },
+      keyup: function(event){
+        switch(event.keyCode){
+          case 37: // left
+            mtl.ship.stopRotatingLeft();
+            event.stopPropagation();
+            break;
+          case 38: // up
+            mtl.ship.stopAccelerating();
+            event.stopPropagation();
+            break;
+          case 39: // right
+            mtl.ship.stopRotatingRight();
+            event.stopPropagation();
+            break;
+          case 40: // down
+            mtl.ship.stopDecelerating();
+            event.stopPropagation();
+            break;
+        }
+      },
+      draw: function(){
+        mtl.board.draw();
+        mtl.ship.draw();
+        mtl.stats.draw();
+        // track stats
+        mtl.stats.frames += 1;
+      },
+      stats: {
+        frames: 0,
+        lastUpdate: new Date(),
+        draw: function(){
+          // draw the stats box
+          mtl.context.fillStyle = "#000000";
+          mtl.context.fillRect(0,0,70,50);
+          mtl.context.strokeStyle = "#990000";
+          mtl.context.strokeRect(0,0,70,50);
+          // slap in the text
+          mtl.context.fillStyle = "#ffffff";
+          mtl.context.fillText("fps: " + Math.round(mtl.stats.fps*10)/10,5,13);
+          mtl.context.fillText("velocity: " + Math.round(mtl.ship.velocity*10)/10,5,28);
+          mtl.context.fillText("direction: " + Math.round(mtl.ship.direction*10)/10,5,43);
+        },
+        update: function(){
+          mtl.stats.fps = mtl.stats.frames / ((new Date() - mtl.stats.lastUpdate) / 1000.0);
+          // start counting over
+          mtl.stats.frames = 0.0;
+          mtl.stats.lastUpdate = new Date();
+        }
+      },
+      Board: function(){
+        this.background = document.createElement('img');
+        this.background.setAttribute('src','stars.png');
+        this.background.setAttribute('width','1024');
+        this.background.setAttribute('height','768');
+
+        this.x = 0;
+        this.y = 0;
+        this.draw = function(){
+          this.x = mtl.ship.x;
+          this.y = mtl.ship.y;
+          mtl.context.drawImage(this.background,this.x,this.y);
+          if(this.x > 0){
+            mtl.context.drawImage(this.background,this.x - this.background.width,this.y);
+            if(this.y > 0){
+              mtl.context.drawImage(this.background,this.x - this.background.width,this.y - this.background.height);
+            }
+            if(this.y + this.background.height < mtl.canvas.height){
+              mtl.context.drawImage(this.background,this.x - this.background.width,this.y + this.background.height);
+            }
+          }
+          if(this.x + this.background.width < mtl.canvas.width){
+            mtl.context.drawImage(this.background,this.x + this.background.width,this.y);
+            if(this.y > 0){
+              mtl.context.drawImage(this.background,this.x + this.background.width,this.y - this.background.height);
+            }
+            if(this.y + this.background.height < mtl.canvas.height){
+              mtl.context.drawImage(this.background,this.x + this.background.width,this.y + this.background.height);
+            }
+          }
+          if(this.y > 0){
+            mtl.context.drawImage(this.background,this.x,this.y - this.background.height);
+          }
+          if(this.y + this.background.height < mtl.canvas.height){
+            mtl.context.drawImage(this.background,this.x,this.y + this.background.height);
+          }
+//          this.y += 10;
+          mtl.ship.y %= this.background.height;
+//          this.x += 10;
+          mtl.ship.x %= this.background.width;
+        }
+      },
+      Ship: function(){
+        this.context = mtl.context;
+        this.icon = document.createElement('img');
+        this.icon.setAttribute('src','ship.png');
+        this.icon.setAttribute('width','107');
+        this.icon.setAttribute('height','105');
+
+        this.x = 0;
+        this.y = 0;
+        this.acceleration = 0.1; // pixels per second
+        this.velocity = 0;
+        this.rotation = 0; // radians per second
+        this.direction = 0;
+        this.lastUpdate = new Date();
+        this.update = function(){
+          var elapsed = new Date() - this.lastUpdate;
+          this.direction += this.rotation * elapsed;
+          this.x = this.x + Math.sin(this.direction) * this.velocity * elapsed;
+          this.y = this.y + Math.cos(this.direction) * this.velocity * elapsed;
+          this.lastUpdate = new Date();
+        }
+        this.draw = function(){
+          this.update();
+          this.context.translate(mtl.canvas.width / 2,mtl.canvas.height / 2);
+          this.context.rotate(-this.direction);
+          this.context.drawImage(this.icon,-this.icon.width / 2,-this.icon.height / 2);
+          this.context.rotate(this.direction);
+          this.context.translate(-mtl.canvas.width / 2,-mtl.canvas.height / 2);
+        }
+        this.accelerate = function(keypress){
+          if(keypress && this.accelerating) return;
+          this.velocity += this.acceleration;
+          this.accelerating = setTimeout('mtl.ship.accelerate(false)', mtl.KEY_REPEAT);
+        }
+        this.stopAccelerating = function(){
+          clearTimeout(this.accelerating);
+          this.accelerating = undefined;
+        }
+        this.decelerate = function(keypress){
+          if(keypress && this.decelerating) return;
+          this.velocity -= this.acceleration;
+          this.decelerating = setTimeout('mtl.ship.decelerate(false)', mtl.KEY_REPEAT);
+        }
+        this.stopDecelerating = function(){
+          clearTimeout(this.decelerating);
+          this.decelerating = undefined;
+        }
+        this.rotateLeft = function(keypress){
+          if(keypress && this.rotatingLeft) return;
+//          this.rotation = 0.005;
+          this.rotation += 0.001;
+          this.rotatingLeft = setTimeout('mtl.ship.rotateLeft(false)', mtl.KEY_REPEAT);
+        }
+        this.stopRotatingLeft = function(){
+          clearTimeout(this.rotatingLeft);
+          this.rotatingLeft = undefined;
+//          this.rotation = 0;
+        }
+        this.rotateRight = function(keypress){
+          if(keypress && this.rotatingRight) return;
+//          this.rotation = -0.005;
+          this.rotation -= 0.001;
+          this.rotatingRight = setTimeout('mtl.ship.rotateRight(false)', mtl.KEY_REPEAT);
+        }
+        this.stopRotatingRight = function(){
+          clearTimeout(this.rotatingRight);
+          this.rotatingRight = undefined;
+//          this.rotation = 0;
+        }
+      }
+    }
+
+  </script>
+</body>
+</html>
